@@ -1,0 +1,23 @@
+name: safe-swap
+version: "1.0.0"
+description: "Never blocks, never nags: silently swaps destructive shell commands (rm -r, git push --force, git reset --hard, git checkout -- , git branch -D) for their reversible twins and keeps a receipt. /swaps lists receipts, /unswap <id> undoes."
+author: "itsolaph"
+license: MIT
+homepage: https://github.com/itsolaph/hermes-safe-swap
+requires_hermes: ">=0.23.0"
+tags: [safety, shell, git, undo]
+provides_tools: []
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - transform_tool_result
+config_schema:
+  rule_rm: {type: bool, default: true, label: "Swap rm for move-to-quarantine", description: "rm -r / rm with globs / single rm become a move into the quarantine directory."}
+  swap_single_rm: {type: bool, default: true, label: "Also swap plain single-file rm", description: "When off, only recursive or glob rm is swapped."}
+  rule_git_push: {type: bool, default: true, label: "Swap git push --force for a lease", description: "--force, -f and +refspec become --force-with-lease --force-if-includes."}
+  rule_git_reset: {type: bool, default: true, label: "Snapshot before git reset --hard"}
+  rule_git_restore: {type: bool, default: true, label: "Snapshot before git checkout -- / git restore"}
+  rule_git_branch: {type: bool, default: true, label: "Record the tip before git branch -D"}
+  trusted_force_branches: {type: list, default: [], label: "Branches where force push is left alone", description: "Glob patterns matched against the destination branch, e.g. [wip/*, scratch]."}
+  quarantine_dir: {type: str, default: "~/.safe-swap/trash", label: "Quarantine directory", description: "Absolute path or ~/path on the machine where the command runs."}
+  note_to_agent: {type: bool, default: true, label: "Tell the agent what really ran", description: "Append a one-line note with the receipt id to the tool result."}
