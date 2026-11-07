@@ -41,8 +41,18 @@ def dispatch_runner(dispatch_tool: Callable[..., str]) -> Runner:
             data = json.loads(raw)
         except (TypeError, ValueError):
             return 1, str(raw)
+        if not isinstance(data, dict):
+            return 1, str(raw)
         code = data.get("exit_code")
         text = str(data.get("output") or data.get("error") or "").strip()
+        if data.get("approval_pending") or data.get("status") in ("pending_approval", "blocked") or (
+            not isinstance(code, int) and not text
+        ):
+            reason = data.get("description") or data.get("message") or data.get("error") or "no reason given"
+            return 1, (
+                f"Hermes' approval gate did not run the script ({reason}). Approve it when asked, "
+                "or run the same action with `hermes safe-swap` in a terminal."
+            )
         return (code if isinstance(code, int) else 1), text
 
     return run
@@ -99,7 +109,7 @@ class Service:
                 f"Receipt {receipt.id}: `{receipt.original}` ran as a lease-protected push. A push cannot be "
                 "undone from here: if the lease held, the remote moved; if it did not, the push was refused and nothing changed."
             )
-        code, out = self._run(restore_script(quarantine_expr(receipt.qdir), receipt.id, force=force), receipt.task_id)
+        code, out = self._run(restore_script(quarantine_expr(receipt.qdir), receipt.id, force=force, kinds=receipt.kinds), receipt.task_id)
         if code == 0:
             store.set_status(receipt.id, "undone")
         extra = "\nNote: the force push in the same command cannot be undone." if "push" in receipt.kinds else ""

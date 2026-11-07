@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from safe_swap.commands import Service, cli_handler, cli_setup, local_runner
+from safe_swap.commands import Service, cli_handler, cli_setup, dispatch_runner, local_runner
 from safe_swap.receipts import Receipt, Store
 from safe_swap.runtime import Runtime, describe
 
@@ -196,3 +196,31 @@ def test_cli_handler_roundtrip(rt, svc, tmp_path, capsys) -> None:
     assert f.read_text() == "1"
     cli_handler(svc, parser.parse_args(["purge", "--older", "1d"]))
     assert "Purged 0" in capsys.readouterr().out.splitlines()[-1]
+
+
+@pytest.mark.parametrize("payload", [
+    {"output": "", "exit_code": None, "status": "pending_approval", "description": "recursive delete"},
+    {"output": "", "error": "BLOCKED: denied", "status": "blocked"},
+    {"approval_pending": True, "output": ""},
+])
+def test_dispatch_runner_explains_approval_gate_instead_of_hanging(payload) -> None:
+    code, text = dispatch_runner(lambda tool, args, **kw: json.dumps(payload))("true", "t")
+    assert code == 1 and "approval gate" in text
+
+
+def test_dispatch_runner_passes_task_id_and_parses_output() -> None:
+    seen = {}
+
+    def fake(tool, args, **kw):
+        seen.update(tool=tool, args=args, kw=kw)
+        return json.dumps({"output": "restored: x\n", "exit_code": 0})
+
+    assert dispatch_runner(fake)("script", "task-9") == (0, "restored: x")
+    assert seen["tool"] == "terminal" and seen["kw"] == {"task_id": "task-9"} and seen["args"]["command"] == "script"
+    assert dispatch_runner(lambda *a, **k: "not json")("s", "") == (1, "not json")
+
+
+def test_post_marks_cancelled_as_failed(rt) -> None:
+    d = pre(rt, "rm -rf x", "k1")
+    rt.post_tool_call(tool_name="terminal", args=d["args"], result="cancelled", tool_call_id="k1", status="cancelled")
+    assert rt.store().by_call("k1").status == "failed"

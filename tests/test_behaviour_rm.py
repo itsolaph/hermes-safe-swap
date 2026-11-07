@@ -165,3 +165,12 @@ def box_cmd(box, command: str) -> str:
     r = rewrite(command, box.cfg, box.rid)
     assert r is not None
     return r.command
+
+
+def test_cdpath_does_not_corrupt_the_manifest(box) -> None:
+    (box.work / "sub").mkdir()
+    (box.work / "sub" / "f").write_text("1")
+    box.env["CDPATH"] = str(box.work)
+    assert box.swap("rm -rf sub").code == 0
+    assert box.undo().code == 0
+    assert (box.work / "sub" / "f").read_text() == "1"

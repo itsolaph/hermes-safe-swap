@@ -21,6 +21,7 @@ _BIN_DIRS = ("/bin/", "/usr/bin/", "/usr/local/bin/", "/opt/homebrew/bin/")
 _RESERVED = {"do", "done", "then", "fi", "else", "elif", "esac", "in", "case", "if", "while", "until", "for"}
 _HOME_TARGET = re.compile(r"^(~|\$HOME|\$\{HOME\})/*\*?$")
 _ROOT_TARGET = re.compile(r"^/+\*?$")
+_TOP_LEVEL_TARGET = re.compile(r"^/+[^/*]*/*\*?$")  # "/x", "/x/", "/x/*": a top-level directory or its contents
 _SYSTEM_TARGET = re.compile(
     r"^/(etc|usr|bin|sbin|lib|lib32|lib64|boot|dev|proc|sys|var|root|home|opt|srv|mnt|media|run)(/[^/*]+)?/*\*?$"
 )
@@ -66,7 +67,9 @@ def _dangerous_target(tok: Tok) -> bool:
         return True
     if ".safe-swap" in v:
         return True
-    return bool(_HOME_TARGET.match(v) or _ROOT_TARGET.match(v) or _SYSTEM_TARGET.match(v))
+    return bool(
+        _HOME_TARGET.match(v) or _ROOT_TARGET.match(v) or _TOP_LEVEL_TARGET.match(v) or _SYSTEM_TARGET.match(v)
+    )
 
 
 def _tmp_target(tok: Tok) -> bool:

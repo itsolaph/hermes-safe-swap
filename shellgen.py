@@ -11,8 +11,8 @@ MARKER = "SS_RCPT="
 
 _UNSET_RM = "unset SS_Q SS_N SS_P SS_T SS_D SS_RC SS_RCPT"
 _GIT_IDENT = (
-    "GIT_AUTHOR_NAME=safe-swap GIT_AUTHOR_EMAIL=safe-swap@localhost "
-    "GIT_COMMITTER_NAME=safe-swap GIT_COMMITTER_EMAIL=safe-swap@localhost"
+    "GIT_AUTHOR_NAME=safe-swap GIT_AUTHOR_EMAIL=safe-swap "
+    "GIT_COMMITTER_NAME=safe-swap GIT_COMMITTER_EMAIL=safe-swap"
 )
 
 
@@ -37,7 +37,7 @@ def rm_block(base: str, rid: str, slot: str, targets: list[str], *, force: bool,
     body = (
         f'if [ -e "$SS_P" ] || [ -L "$SS_P" ]; then {is_dir}'
         'SS_T=${SS_P%"${SS_P##*[!/]}"}; [ -n "$SS_T" ] || SS_T=$SS_P; '
-        'SS_D=$(cd -- "$(dirname -- "$SS_T")" 2>/dev/null && pwd -P) || SS_D=; '
+        'SS_D=$(unset CDPATH; cd -- "$(dirname -- "$SS_T")" 2>/dev/null && pwd -P) || SS_D=; '
         "SS_N=$((SS_N+1)); "
         'if [ -n "$SS_D" ] && mv -- "$SS_T" "$SS_Q/$SS_N"; then '
         "printf '%s\\t%s/%s\\n' \"$SS_N\" \"${SS_D%/}\" \"$(basename -- \"$SS_T\")\" >> \"$SS_Q/manifest.tsv\"; "
@@ -55,14 +55,14 @@ def rm_block(base: str, rid: str, slot: str, targets: list[str], *, force: bool,
 
 
 def snapshot_block(base: str, rid: str, slot: str, gopts: str, original: str) -> str:
-    """Run ``git stash create`` + ``stash store`` (tree untouched), record where, then the original."""
+    """``git stash create`` + a private ref (tree and stash stack untouched), record where, then the original."""
     g = f"git {gopts} " if gopts else "git "
     return (
         f"{{ {_slot_dir(base, rid, slot)}; "
         f'mkdir -p -- "$SS_Q" 2>/dev/null && {{ {g}rev-parse --show-toplevel > "$SS_Q/gitdir" && '
         f'{g}rev-parse HEAD > "$SS_Q/head"; }} 2>/dev/null; '
         f"SS_SHA=$({_GIT_IDENT} {g}stash create 2>/dev/null) || SS_SHA=; "
-        f'if [ -n "$SS_SHA" ] && [ -d "$SS_Q" ] && {g}stash store -m "safe-swap {rid}" "$SS_SHA" 2>/dev/null; then '
+        f'if [ -n "$SS_SHA" ] && [ -d "$SS_Q" ] && {g}update-ref "refs/safe-swap/{slot}" "$SS_SHA" 2>/dev/null; then '
         "printf '%s\\n' \"$SS_SHA\" > \"$SS_Q/stash.sha\"; "
         f"elif ! {g}diff --quiet HEAD -- 2>/dev/null; then "
         "printf 'safe-swap: could not snapshot the working tree; running unprotected\\n' >&2; fi; "

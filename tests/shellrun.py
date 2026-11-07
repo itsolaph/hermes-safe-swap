@@ -57,5 +57,5 @@ class Sandbox:
         path.mkdir(parents=True, exist_ok=True)
         self.git("init", "-q", "-b", "main", cwd=path)
         self.git("config", "user.name", "t", cwd=path)
-        self.git("config", "user.email", "t@example.invalid", cwd=path)
+        self.git("config", "user.email", "t", cwd=path)
         return path

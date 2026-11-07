@@ -8,7 +8,7 @@ mkdir -p "$SANDBOX"
 export GIT_CONFIG_GLOBAL="$SANDBOX/gitconfig" GIT_CONFIG_NOSYSTEM=1
 git config --global init.defaultBranch main
 git config --global user.name "demo"
-git config --global user.email "demo@example.invalid"
+git config --global user.email "demo"
 
 git init -q --bare "$SANDBOX/remote.git"
 

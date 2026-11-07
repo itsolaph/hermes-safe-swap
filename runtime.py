@@ -100,7 +100,7 @@ class Runtime:
             if receipt is None:
                 return
             exit_code = _exit_code(result)
-            failed = status == "blocked" or (exit_code not in (None, 0))
+            failed = status in ("blocked", "cancelled") or (exit_code not in (None, 0))
             self.store().settle(receipt.id, "failed" if failed else "applied", exit_code)
         except Exception:  # noqa: BLE001
             logger.debug("safe-swap post_tool_call failed", exc_info=True)

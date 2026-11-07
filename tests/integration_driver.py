@@ -57,7 +57,7 @@ repo = work / "repo"
 repo.mkdir()
 git("init", "-q", "-b", "main", cwd=repo)
 git("config", "user.name", "t", cwd=repo)
-git("config", "user.email", "t@example.invalid", cwd=repo)
+git("config", "user.email", "t", cwd=repo)
 (repo / "a.txt").write_text("one\n")
 git("add", "a.txt", cwd=repo)
 git("commit", "-qm", "first", cwd=repo)

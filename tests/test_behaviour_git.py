@@ -42,7 +42,8 @@ def test_reset_hard_snapshot_and_undo(box, repo) -> None:
     assert u.code == 0, u.out
     assert (repo / "a.txt").read_text() == "edited\n"
     assert (repo / "new.txt").read_text() == "staged new\n"
-    assert "safe-swap" in box.git("stash", "list", cwd=repo)
+    assert box.git("for-each-ref", "refs/safe-swap", cwd=repo)
+    assert box.git("stash", "list", cwd=repo) == ""  # the user's stash stack is never touched
 
 
 def test_reset_hard_to_older_commit_undoes_fully(box, repo) -> None:
@@ -63,7 +64,7 @@ def test_undo_does_not_clobber_commits_made_after_the_reset(box, repo) -> None:
     later = box.git("rev-parse", "HEAD", cwd=repo)
     u = box.undo()
     assert box.git("rev-parse", "HEAD", cwd=repo) == later
-    assert f"git reset --hard {old_head}" in u.out
+    assert f"HEAD was {old_head}" in u.out
 
 
 def test_reset_hard_clean_tree_is_harmless(box, repo) -> None:
@@ -147,7 +148,7 @@ def remote(box, repo):
     mate = box.root / "mate"
     box.git("clone", "-q", str(bare), str(mate), cwd=box.root)
     box.git("config", "user.name", "mate", cwd=mate)
-    box.git("config", "user.email", "mate@example.invalid", cwd=mate)
+    box.git("config", "user.email", "mate", cwd=mate)
     return bare, mate
 
 
@@ -211,3 +212,37 @@ def test_plus_refspec_is_protected_too(box, repo, remote) -> None:
 def test_rewritten_push_has_no_unswapped_force(box) -> None:
     r = rewrite("git push -f origin main", box.cfg, box.rid)
     assert r is not None and " -f" not in r.command and "--force " not in r.command
+
+
+def test_users_stash_stack_is_not_shifted(box, repo) -> None:
+    (repo / "a.txt").write_text("stashed by the user\n")
+    box.git("stash", cwd=repo)
+    (repo / "b.txt").write_text("edited after\n")
+    assert box.swap("git checkout -- b.txt", cwd=repo).code == 0
+    assert box.git("stash", "list", cwd=repo).count("\n") == 0 and "stash@{0}" in box.git("stash", "list", cwd=repo)
+    box.git("stash", "pop", cwd=repo)
+    assert (repo / "a.txt").read_text() == "stashed by the user\n"
+
+
+def test_purge_removes_snapshot_ref(box, repo) -> None:
+    from safe_swap.config import quarantine_expr
+    from safe_swap.undo import purge_script
+
+    (repo / "a.txt").write_text("edited\n")
+    box.swap("git reset --hard", cwd=repo)
+    assert box.git("for-each-ref", "refs/safe-swap", cwd=repo)
+    assert box.sh(purge_script(quarantine_expr(box.cfg.quarantine_dir), [box.rid])).code == 0
+    assert box.git("for-each-ref", "refs/safe-swap", cwd=repo) == ""
+    assert not (box.home / ".safe-swap" / "trash" / box.rid).exists()
+
+
+def test_restore_script_only_contains_sections_for_its_kinds(box) -> None:
+    from safe_swap.config import quarantine_expr
+    from safe_swap.undo import restore_script
+
+    base = quarantine_expr(box.cfg.quarantine_dir)
+    rm_only = restore_script(base, box.rid, kinds=["rm"])
+    assert "git" not in rm_only
+    assert "reset --hard" not in restore_script(base, box.rid, kinds=["checkout"])
+    assert "reset --hard" in restore_script(base, box.rid, kinds=["reset"])
+    assert "git branch" in restore_script(base, box.rid, kinds=["branch"])
