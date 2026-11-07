@@ -20,40 +20,46 @@ it never assumes protection it does not have.
 
 ## Demo
 
+Real output from one run through the Hermes plugin loader (sandbox paths shortened; the teammate pushed a commit the agent never fetched):
+
 ```text
-$ git push --force origin main          # a teammate pushed a commit the agent never fetched
+$ git push --force origin main
+To ~/demo/remote.git
  ! [rejected]        main -> main (stale info)
-[safe-swap] `git push --force origin main` was run as: git push --force-with-lease --force-if-includes (not --force) (receipt d18287). Not undoable (the lease only refuses unsafe pushes).
-exit 1
+error: failed to push some refs to '~/demo/remote.git'
+[safe-swap] `git push --force origin main` was run as: git push --force-with-lease --force-if-includes (not --force) (receipt 4dfef3). Not undoable (the lease only refuses unsafe pushes).
+[exit 1]
 
 $ rm -r build
-[safe-swap] `rm -r build` was run as: move-to-quarantine (312 files, 14 MB, receipt ff0db2). Undo: /unswap ff0db2
-exit 0
+[safe-swap] `rm -r build` was run as: move-to-quarantine (4002 files, 10 MB, receipt 4dc78a). Undo: /unswap 4dc78a
 
 $ git clean -fd
+Removing notes.txt
 Removing scratch.txt
+Removing scratch/
 Removing tmp_dir/
-[safe-swap] `git clean -fd` was run as: preceded by a snapshot of the untracked files (receipt 257313). Undo: /unswap 257313
-exit 0
+[safe-swap] `git clean -fd` was run as: preceded by a snapshot of the untracked files (receipt 664434). Undo: /unswap 664434
 
 $ git stash drop
-Dropped refs/stash@{0} (69bac301968522784d80fdf928974f5a9aa4d1a3)
-[safe-swap] `git stash drop` was run as: preceded by a record of the dropped stash entries (receipt a9e718). Undo: /unswap a9e718
-exit 0
+Dropped refs/stash@{0} (55a7a4add0af30ad725aabed754885f3f83f1793)
+[safe-swap] `git stash drop` was run as: preceded by a record of the dropped stash entries (receipt 04405f). Undo: /unswap 04405f
 
-$ rm -r $(echo nothing-here)            # shell syntax the rewriter will not guess about
+$ rm -r $(echo nothing-here)
+rm: cannot remove 'nothing-here': No such file or directory
 [safe-swap] NOT swapped (unsupported syntax: command substitution / arithmetic): rm -r $(echo nothing-here)
-exit 0
+[exit 1]
 
 > /swaps
-id      age   status   kind      size             command
-a9e718  now   applied  stash     -                git stash drop
-257313  now   applied  clean     -                git clean -fd
-ff0db2  now   applied  rm        312 files, 14 MB rm -r build
+id      age   status   kind      size              command
+04405f  now   applied  stash     -                 git stash drop
+664434  now   applied  clean     -                 git clean -fd
+4dc78a  now   applied  rm        4002 files, 10 MB rm -r build
+4dfef3  now   failed   push      -                 git push --force origin main
+Undo with /unswap <id> (or /unswap last). /swaps purge [--older 7d] frees quarantine space.
 
-> /unswap ff0db2
-Undone ff0db2.
-restored: /path/to/project/build
+> /unswap 4dc78a
+Undone 4dc78a.
+restored: ~/demo/project/build
 ```
 
 `demo/demo.sh` builds a throwaway scenario (project, build dir, bare remote, a teammate commit) and
