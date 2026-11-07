@@ -1,6 +1,11 @@
+import sys
+from pathlib import Path
+
 import pytest
 
-from .shellrun import SHELLS, Sandbox
+sys.path.insert(0, str(Path(__file__).parent))
+
+from shellrun import SHELLS, Sandbox  # noqa: E402
 
 
 @pytest.fixture(params=SHELLS)

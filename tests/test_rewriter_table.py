@@ -179,7 +179,7 @@ SWAPS = [
     ("rm -f file.txt", "rm", ["for SS_P in file.txt;", "else :; fi"]),
     ("rm -rf a b c", "rm", ["for SS_P in a b c;"]),
     ("rm -rf do", "rm", ["for SS_P in ./do;"]),
-    ("rm -rf ~/proj/build", "rm", ["for SS_P in ~/proj/build;"]),
+    ("rm -rf proj/build", "rm", ["for SS_P in proj/build;"]),
     ("rm -rf /var/tmp/x ../build", "rm", ["for SS_P in /var/tmp/x ../build;"]),
     ("cd x && rm -rf y | tee log", "rm", ["cd x && { SS_RCPT=", "for SS_P in y;", "} | tee log"]),
     ("rm -rf build 2>/dev/null", "rm", ["} 2>/dev/null"]),

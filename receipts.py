@@ -54,6 +54,8 @@ class Store:
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=1.0)
+        # No fsync per hook call: the quarantine files are the source of truth, the row is an index.
+        conn.execute("PRAGMA synchronous=OFF")
         conn.execute(_SCHEMA)
         return conn
 
