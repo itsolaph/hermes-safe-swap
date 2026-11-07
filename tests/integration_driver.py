@@ -66,6 +66,26 @@ out["reset"] = call(f"cd {repo} && git reset --hard", "call_reset")
 out["reset_content"] = (repo / "a.txt").read_text()
 out["push_note"] = call(f"cd {repo} && git push -f origin main", "call_push")
 
+# 3b. git clean and git stash drop: snapshot, run, note; the receipts restore them
+(repo / "untracked.txt").write_text("keep me\n")
+out["clean"] = call(f"cd {repo} && git clean -fd", "call_clean")
+out["clean_gone"] = not (repo / "untracked.txt").exists()
+(repo / "a.txt").write_text("stashed edit\n")
+git("stash", "push", "-q", "-m", "wip", cwd=repo)
+out["stash"] = call(f"cd {repo} && git stash drop", "call_stash")
+out["stash_after_drop"] = git("stash", "list", cwd=repo)
+swaps_all = cmds["swaps"]["handler"]("")
+by_kind = {line.split()[3]: line.split()[0] for line in swaps_all.splitlines()[1:-1]}  # id age status kind ...
+clean_id, stash_id = by_kind["clean"], by_kind["stash"]
+out["undo_clean"] = cmds["unswap"]["handler"](clean_id)
+out["undo_stash"] = cmds["unswap"]["handler"](stash_id)
+out["clean_restored"] = (repo / "untracked.txt").read_text() if (repo / "untracked.txt").exists() else None
+out["stash_restored"] = git("stash", "list", cwd=repo)
+
+# 3c. a destructive command the plugin cannot rewrite: it runs as written and the note says so
+out["unswapped"] = call("rm -rf $(echo ss_nonexistent_path_for_the_test)", "call_unswapped")
+out["harmless"] = call("echo hello", "call_harmless")
+
 # 4. fail-open on garbage
 huge = "rm -rf x " + "a" * 200_000
 out["garbage"] = {repr(g)[:30]: directive(g) for g in (None, 5, b"rm -rf x", ["rm"], {"a": 1}, "", huge)}

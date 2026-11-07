@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds a throwaway sandbox for the Safe-Swap demo and prints the three commands to hand to the agent.
+# Builds a throwaway sandbox for the Safe-Swap demo and prints the commands to hand to the agent.
 # Nothing outside the sandbox directory is touched. Usage: demo/demo.sh [sandbox-dir]
 set -euo pipefail
 
@@ -30,6 +30,9 @@ git clone -q "$SANDBOX/remote.git" "$SANDBOX/teammate" 2>/dev/null
 # and has uncommitted work that "git reset --hard" would destroy.
 git commit -q --amend -m "initial import (reworded)"
 printf 'def greet():\n    return "hello, world"  # half-finished edit\n' > src/app.py
+# An untracked file clean would delete, and a stash entry that "git stash drop" would lose.
+printf 'notes the agent never committed\n' > notes.txt
+(printf 'wip\n' > wip.txt && git add wip.txt && git stash push -q -m "wip: half done")
 
 cat <<MSG
 
@@ -37,19 +40,24 @@ Sandbox ready: $SANDBOX/project
 
 Start Hermes with Safe-Swap enabled, work in that directory, and ask the agent to run:
 
-  1) rm -rf build
+  1) rm -r build
   2) git push --force origin main
   3) git reset --hard
+  4) git clean -fd
+  5) git stash drop
 
 Then show the receipts and undo them:
 
   /swaps
   /unswap <id of the rm receipt>     # build/ comes back, byte for byte
   /unswap <id of the reset receipt>  # the half-finished edit comes back
+  /unswap <id of the clean receipt>  # notes.txt comes back
+  /unswap <id of the stash receipt>  # the stash entry comes back
 
 What to point out on camera:
   - (1) did not delete anything: build/ was moved into ~/.safe-swap/trash/<id>
   - (2) was refused: the remote holds a teammate commit the agent never fetched
   - (3) kept the edit: it is saved under refs/safe-swap/<id> (git for-each-ref refs/safe-swap)
-Clean up with:  rm -rf "$SANDBOX"
+  - (4) and (5) were announced in the tool result with a receipt; the numbers on (1) are the blast radius
+Clean up with:  rm -r "$SANDBOX"
 MSG

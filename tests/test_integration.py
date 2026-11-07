@@ -57,6 +57,30 @@ def test_rm_is_swapped_executed_and_explained(out) -> None:
     assert Path(out["home"], ".safe-swap", "trash").is_dir()
 
 
+def test_rm_note_carries_the_blast_radius_and_no_marker_line(out) -> None:
+    output = out["rm"]["result"]["output"]
+    assert "SS_STATS" not in output
+    assert "move-to-quarantine (1 file, 7 B, receipt " in output
+    assert "1 file, 7 B" in out["swaps"]
+
+
+def test_clean_and_stash_drop_are_swapped_noted_and_undone(out) -> None:
+    assert out["clean_gone"] is True and out["clean"]["exit_code"] == 0
+    assert "preceded by a snapshot of the untracked files" in out["clean"]["output"]
+    assert "SS_STATS" not in out["clean"]["output"]
+    assert out["stash_after_drop"] == "" and out["stash"]["exit_code"] == 0
+    assert "preceded by a record of the dropped stash entries" in out["stash"]["output"]
+    assert out["undo_clean"].startswith("Undone") and out["clean_restored"] == "keep me\n"
+    assert out["undo_stash"].startswith("Undone") and "wip" in out["stash_restored"]
+
+
+def test_untouched_destructive_command_is_announced_and_harmless_one_is_not(out) -> None:
+    lines = out["unswapped"]["output"].splitlines()
+    assert lines[-1].startswith("[safe-swap] NOT swapped (unsupported syntax: command substitution")
+    assert lines[-1].endswith("): rm -rf $(echo ss_nonexistent_path_for_the_test)")
+    assert "NOT swapped" not in out["harmless"]["output"] and "safe-swap" not in out["harmless"]["output"]
+
+
 def test_swaps_and_unswap_round_trip(out) -> None:
     assert "applied" in out["swaps"] and "rm -rf build" in out["swaps"]
     assert out["unswap"].startswith("Undone")

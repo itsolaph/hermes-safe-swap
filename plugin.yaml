@@ -1,6 +1,6 @@
 name: safe-swap
 version: "1.0.0"
-description: "Never blocks, never nags: silently swaps destructive shell commands (rm -r, git push --force, git reset --hard, git checkout -- , git branch -D) for their reversible twins and keeps a receipt. /swaps lists receipts, /unswap <id> undoes."
+description: "Never blocks, never nags: silently swaps destructive shell commands (git push --force, rm -r, git reset --hard, git checkout -- , git clean, git stash drop, git branch -D) for their reversible twins and keeps a receipt. /swaps lists receipts, /unswap <id> undoes; the agent is told what ran and when a destructive command was NOT swapped."
 author: "itsolaph"
 license: MIT
 homepage: https://github.com/itsolaph/hermes-safe-swap
@@ -18,6 +18,9 @@ config_schema:
   rule_git_reset: {type: bool, default: true, label: "Snapshot before git reset --hard"}
   rule_git_restore: {type: bool, default: true, label: "Snapshot before git checkout -- / git restore"}
   rule_git_branch: {type: bool, default: true, label: "Record the tip before git branch -D"}
+  rule_git_clean: {type: bool, default: true, label: "Snapshot untracked files before git clean", description: "git clean -f/-fd/-fdx/-fX commit the files clean may delete to a private ref first; git clean -n is left alone."}
+  rule_git_stash: {type: bool, default: true, label: "Record stash entries before git stash drop / clear"}
   trusted_force_branches: {type: list, default: [], label: "Branches where force push is left alone", description: "Glob patterns matched against the destination branch, e.g. [wip/*, scratch]."}
   quarantine_dir: {type: str, default: "~/.safe-swap/trash", label: "Quarantine directory", description: "Absolute path or ~/path on the machine where the command runs."}
   note_to_agent: {type: bool, default: true, label: "Tell the agent what really ran", description: "Append a one-line note with the receipt id to the tool result."}
+  notify_unswapped: {type: bool, default: true, label: "Tell the agent when a destructive command was NOT swapped", description: "Append a one-line [safe-swap] NOT swapped (reason) note when rm -r, git reset --hard, git push --force ... ran untouched."}

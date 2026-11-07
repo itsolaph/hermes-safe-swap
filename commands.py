@@ -16,6 +16,7 @@ from typing import Any, Callable
 
 from .config import quarantine_expr
 from .receipts import Receipt, Store
+from .runtime import receipt_size
 from .undo import purge_script, restore_script
 
 __all__ = ["Service", "cli_handler", "cli_setup", "dispatch_runner", "local_runner"]
@@ -81,10 +82,15 @@ class Service:
         if not receipts:
             return "No swaps yet. Destructive shell commands are swapped for reversible twins as they run."
         now = time.time()
-        rows = [f"{'id':<7} {'age':<5} {'status':<8} {'kind':<9} command"]
-        for r in receipts:
+        sizes = [receipt_size(r) for r in receipts]
+        width = max([len("size")] + [len(x) for x in sizes])
+        rows = [f"{'id':<7} {'age':<5} {'status':<8} {'kind':<9} {'size':<{width}} command"]
+        for r, size in zip(receipts, sizes):
             cmd = " ".join(r.original.split())
-            rows.append(f"{r.id:<7} {_age(now - r.ts):<5} {r.status:<8} {r.kind:<9} {cmd[:60]}{'…' if len(cmd) > 60 else ''}")
+            rows.append(
+                f"{r.id:<7} {_age(now - r.ts):<5} {r.status:<8} {r.kind:<9} {size:<{width}} "
+                f"{cmd[:60]}{'…' if len(cmd) > 60 else ''}"
+            )
         rows.append("Undo with /unswap <id> (or /unswap last). /swaps purge [--older 7d] frees quarantine space.")
         return "\n".join(rows)
 

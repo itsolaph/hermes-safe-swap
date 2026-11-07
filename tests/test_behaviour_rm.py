@@ -114,7 +114,8 @@ def test_exit_status_composes_with_and_or(box) -> None:
 def test_redirects_are_preserved(box) -> None:
     (box.work / "x").write_text("1")
     r = box.swap("rm -rf x 2>/dev/null; rm nothing 2>/dev/null", rid="c1c2c3")
-    assert r.err == ""
+    # rm's own complaint is swallowed by the user's redirection; only safe-swap's stats marker (stripped by the hook) remains
+    assert all(line.startswith("SS_STATS ") for line in r.err.splitlines()), r.err
 
 
 def test_two_segments_use_separate_slots_and_both_restore(box) -> None:
@@ -155,7 +156,7 @@ def test_variables_do_not_leak_into_the_shell(box) -> None:
 def test_unwritable_home_removes_nothing_and_fails(box) -> None:
     (box.work / "f").write_text("1")
     broken = box.sh(f'HOME=/proc/none; {box_cmd(box, "rm f")}')
-    assert broken.code == 1 and "cannot create quarantine" in broken.err
+    assert broken.code == 1 and "NOT swapped (quarantine creation failed, nothing was removed)" in broken.err
     assert (box.work / "f").read_text() == "1"
 
 

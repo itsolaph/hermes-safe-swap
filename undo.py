@@ -65,6 +65,39 @@ _BRANCH_SECTION = """  if [ -f "$SS_Q/branches.tsv" ] && [ -f "$SS_Q/gitdir" ]; 
   fi
 """
 
+# git clean: the snapshot commit holds every file clean may have deleted (a superset). A throwaway index is loaded
+# from it and `checkout-index` (no -f) writes only the files that are missing. Files that were never deleted match
+# the snapshot and are fine; a file that exists with DIFFERENT content is a conflict that is reported and left alone
+# (--force lets the snapshot win). The real index and the stash stack are never touched.
+_CLEAN_SECTION = """  if [ -f "$SS_Q/clean.sha" ] && [ -f "$SS_Q/gitdir" ]; then
+    SS_ANY=1; SS_G=$(cat "$SS_Q/gitdir"); SS_S=$(cat "$SS_Q/clean.sha"); SS_X="$SS_Q/restore.index"
+    if (cd -- "$SS_G" && GIT_INDEX_FILE="$SS_X" git read-tree "$SS_S"); then
+      (cd -- "$SS_G" && GIT_INDEX_FILE="$SS_X" git checkout-index -a @FORCE@ >/dev/null 2>&1)
+      SS_N=$(cd -- "$SS_G" && GIT_INDEX_FILE="$SS_X" git update-index -q --refresh >/dev/null 2>&1; GIT_INDEX_FILE="$SS_X" git diff-files --name-only -z | tr -cd '\\000' | wc -c); SS_N=$((SS_N+0))
+      if [ "$SS_N" = 0 ]; then
+        echo "restored untracked files in $SS_G"; mv -- "$SS_Q/clean.sha" "$SS_Q/clean.sha.applied"
+      else
+        echo "$SS_N file(s) exist with different content in $SS_G: not restored (use --force); the snapshot stays in refs/safe-swap/${SS_Q##*/}"; SS_RC=1
+      fi
+    else
+      echo "could not read the snapshot $SS_S"; SS_RC=1
+    fi
+  fi
+"""
+
+# git stash drop / clear: put every recorded stash commit back on the stack, oldest first. A dropped
+# stash@{n} comes back as stash@{0}.
+_STASH_SECTION = """  if [ -f "$SS_Q/stash.shas" ] && [ -f "$SS_Q/gitdir" ]; then
+    SS_ANY=1; SS_G=$(cat "$SS_Q/gitdir"); SS_OK=1
+    while read -r SS_H; do
+      [ -n "$SS_H" ] || continue
+      SS_M=$(cd -- "$SS_G" && git log -1 --format=%s "$SS_H" 2>/dev/null)
+      if (cd -- "$SS_G" && git stash store -m "$SS_M" "$SS_H" 2>/dev/null); then echo "restored stash entry: $SS_H"; else echo "failed to restore stash entry: $SS_H"; SS_OK=0; fi
+    done < "$SS_Q/stash.shas"
+    if [ "$SS_OK" = 1 ]; then mv -- "$SS_Q/stash.shas" "$SS_Q/stash.shas.restored"; else SS_RC=1; fi
+  fi
+"""
+
 # Moving HEAD back is only done when HEAD is an ancestor of the old one and the tree is clean.
 _MOVE_HEAD = '(cd -- "$SS_G" && git merge-base --is-ancestor "$SS_NOW" "$SS_H" && git diff --quiet HEAD -- && git reset --hard --quiet "$SS_H")'
 
@@ -90,6 +123,10 @@ def restore_script(base: str, rid: str, *, force: bool = False, kinds: Iterable[
         sections.append(_HEAD_SECTION.replace("@MOVE_HEAD@", _MOVE_HEAD if wanted is None or "reset" in wanted else "false"))
     if wanted is None or "branch" in wanted:
         sections.append(_BRANCH_SECTION)
+    if wanted is None or "clean" in wanted:
+        sections.append(_CLEAN_SECTION.replace("@FORCE@", "-f" if force else ""))
+    if wanted is None or "stash" in wanted:
+        sections.append(_STASH_SECTION)
     return (
         f"SS_B={base}; SS_RC=0; SS_ANY=0; SS_TAB=$(printf '\\t')\n"
         f'for SS_Q in "$SS_B/{rid}" "$SS_B/{rid}".*; do\n  [ -d "$SS_Q" ] || continue\n'

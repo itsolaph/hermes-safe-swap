@@ -19,7 +19,12 @@ CREATE TABLE IF NOT EXISTS receipts (
     qdir TEXT NOT NULL, status TEXT NOT NULL, exit_code INTEGER
 )
 """
-_COLUMNS = "id, ts, session_id, task_id, tool_call_id, kind, original, rewritten, workdir, qdir, status, exit_code"
+_BASE_COLUMNS = "id, ts, session_id, task_id, tool_call_id, kind, original, rewritten, workdir, qdir, status, exit_code"
+_COLUMNS = _BASE_COLUMNS + ", files, bytes, capped, copied"
+# Columns added after v1. An existing receipts.db is upgraded in place; without this the INSERT would raise
+# and every hook call would fail open, silently disabling the plugin for anyone who upgrades.
+_ADDED = (("files", "INTEGER"), ("bytes", "INTEGER"), ("capped", "INTEGER NOT NULL DEFAULT 0"),
+          ("copied", "INTEGER NOT NULL DEFAULT 0"))
 
 
 @dataclass(frozen=True)
@@ -36,6 +41,10 @@ class Receipt:
     qdir: str
     status: str  # pending | applied | failed | undone | purged
     exit_code: int | None
+    files: int | None = None  # blast radius of an rm swap: entries counted before the move (None = not measured)
+    bytes: int | None = None
+    capped: int = 0  # 1 when the count stopped at the walk cap, so files/bytes are lower bounds
+    copied: int = 0  # 1 when the quarantine move degraded to a copy (another filesystem)
 
     @property
     def kinds(self) -> list[str]:
@@ -57,6 +66,13 @@ class Store:
         # No fsync per hook call: the quarantine files are the source of truth, the row is an index.
         conn.execute("PRAGMA synchronous=OFF")
         conn.execute(_SCHEMA)
+        have = {row[1] for row in conn.execute("PRAGMA table_info(receipts)")}
+        for name, decl in _ADDED:
+            if name not in have:
+                try:
+                    conn.execute(f"ALTER TABLE receipts ADD COLUMN {name} {decl}")
+                except sqlite3.OperationalError:  # another process added it first
+                    pass
         return conn
 
     def _rows(self, sql: str, args: tuple = ()) -> Iterator[Receipt]:
@@ -67,7 +83,7 @@ class Store:
     def insert_pending(self, r: Receipt) -> None:
         """Commit the receipt before the rewrite is handed back; raises on id collision."""
         with closing(self._connect()) as conn, conn:
-            conn.execute(f"INSERT INTO receipts ({_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (
+            conn.execute(f"INSERT INTO receipts ({_BASE_COLUMNS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (
                 r.id, r.ts, r.session_id, r.task_id, r.tool_call_id, r.kind, r.original, r.rewritten,
                 r.workdir, r.qdir, "pending", None,
             ))
@@ -97,6 +113,11 @@ class Store:
         with closing(self._connect()) as conn, conn:
             conn.execute("UPDATE receipts SET status = ?, exit_code = COALESCE(?, exit_code) WHERE id = ?",
                          (status, exit_code, rid))
+
+    def set_stats(self, rid: str, files: int, size: int, capped: bool, copied: bool) -> None:
+        with closing(self._connect()) as conn, conn:
+            conn.execute("UPDATE receipts SET files = ?, bytes = ?, capped = ?, copied = ? WHERE id = ?",
+                         (files, size, int(capped), int(copied), rid))
 
     def settle(self, rid: str, status: str, exit_code: int | None) -> None:
         """post_tool_call: pending -> applied/failed; never overwrites undone/purged."""

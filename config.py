@@ -20,9 +20,12 @@ class Config:
     rule_git_reset: bool = True
     rule_git_restore: bool = True
     rule_git_branch: bool = True
+    rule_git_clean: bool = True
+    rule_git_stash: bool = True
     trusted_force_branches: tuple[str, ...] = ()
     quarantine_dir: str = DEFAULT_QUARANTINE
     note_to_agent: bool = True
+    notify_unswapped: bool = True
 
 
 def _bool(value: Any, default: bool) -> bool:
@@ -43,9 +46,12 @@ def load_config(get: Callable[[str, Any], Any]) -> Config:
         rule_git_reset=_bool(get("rule_git_reset", d.rule_git_reset), d.rule_git_reset),
         rule_git_restore=_bool(get("rule_git_restore", d.rule_git_restore), d.rule_git_restore),
         rule_git_branch=_bool(get("rule_git_branch", d.rule_git_branch), d.rule_git_branch),
+        rule_git_clean=_bool(get("rule_git_clean", d.rule_git_clean), d.rule_git_clean),
+        rule_git_stash=_bool(get("rule_git_stash", d.rule_git_stash), d.rule_git_stash),
         trusted_force_branches=tuple(x for x in trusted if isinstance(x, str)) if isinstance(trusted, (list, tuple)) else (),
         quarantine_dir=qdir.rstrip("/") or DEFAULT_QUARANTINE,
         note_to_agent=_bool(get("note_to_agent", d.note_to_agent), d.note_to_agent),
+        notify_unswapped=_bool(get("notify_unswapped", d.notify_unswapped), d.notify_unswapped),
     )
 
 
