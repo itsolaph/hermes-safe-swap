@@ -44,8 +44,7 @@ remote, a teammate commit) and prints the three commands to hand to the agent.
 ## Install
 
 ```bash
-hermes plugins install itsolaph/hermes-safe-swap
-hermes plugins enable safe-swap
+hermes plugins install itsolaph/hermes-safe-swap --enable
 ```
 
 Requires Hermes `>=0.23.0`, a POSIX `sh` on the machine where commands run, and git `>=2.30`
@@ -57,7 +56,7 @@ for the push rule (`--force-if-includes`).
 |---|---|---|
 | `rm -r…`, `rm` with a glob, `rm file` | each target is moved into the quarantine folder (`<id>/<n>`); absolute paths go in `manifest.tsv`. Exit status, `-f` and "No such file" behave like `rm` | `/unswap <id>` moves everything back (refuses to overwrite unless `--force`) |
 | `git push --force`, `-f`, `+refspec` | `--force-with-lease --force-if-includes` (an existing lease is left alone) | none: a lease only refuses pushes that would destroy someone else's work |
-| `git reset --hard [rev]` | `git stash create` + `stash store` first (the tree is not touched), then the original | `/unswap` moves HEAD back if nothing happened since, then re-applies the snapshot |
+| `git reset --hard [rev]` | `git stash create` + a private ref `refs/safe-swap/<id>` first (the tree and your stash stack are not touched), then the original | `/unswap` moves HEAD back if nothing happened since, then re-applies the snapshot |
 | `git checkout -- <paths>`, `git checkout .`, `git restore <paths>` (not `--staged` only) | same snapshot, then the original | `/unswap` re-applies the snapshot |
 | `git branch -D <b>…` | records each branch tip first | `/unswap` runs `git branch <b> <sha>` |
 
@@ -71,8 +70,9 @@ recovery works by hand (`mv` the numbered entry back to the path in `manifest.ts
 Safe-Swap swaps only what it fully understands; everything else runs **untouched**, and Hermes'
 own approval system stays in charge. It is not a guard.
 
-- `/`, `~`, `$HOME`, `/*`, `.`, `..`, top-level system directories: moving those into a quarantine is
-  nonsense, so Hermes' dangerous-command handling decides.
+- `/`, `~`, `$HOME`, `/*`, `.`, `..`, and every top-level absolute directory (`/etc`, `/usr`, `/nix`,
+  `/workspace`, …): moving those into a quarantine is nonsense, and Hermes hard-blocks several of them,
+  so Hermes' own handling decides. A test sweeps every hardline variant to prove none is ever rewritten.
 - Targets under `/tmp`, `/var/tmp`, `$TMPDIR`, and anything touching `.safe-swap` itself.
 - `sudo rm …` / `sudo git …` and other wrappers (`env`, `nohup`, `xargs`, `find -exec/-delete`,
   `bash -c`, `eval`, `source`): root-owned paths cannot be quarantined correctly as the caller.
@@ -109,9 +109,14 @@ own approval system stays in charge. It is not a guard.
 
 ## What it touches (disclosure)
 
-- **Rewrites `terminal` commands before they execute** (`pre_tool_call`, `modify`); never blocks,
-  never raises (any error or doubt means the command runs unchanged), never prompts, so it cannot
-  hang under cron or the gateway.
+- **Rewrites `terminal` commands before they execute** (`pre_tool_call`, `modify`); the hook never
+  blocks, never raises (any error or doubt means the command runs unchanged) and never prompts, so it
+  cannot hang under cron or the gateway.
+- `/unswap` and `/swaps purge` run a generated shell script through the session's terminal tool, so
+  they go through Hermes' normal approval gate like any other command (a purge is an `rm -r`, a
+  `git reset --hard` undo is a hard reset). Where Hermes asks (for example in the gateway) you will be
+  asked; if the gate does not let the script run, the command says so instead of waiting. The local
+  `hermes safe-swap` CLI runs the same scripts directly.
 - **Writes quarantine files** under the user's home on the machine where the command runs
   (`~/.safe-swap/trash/<id>/`), and one SQLite file in the plugin's own data directory
   (`plugin-data/safe-swap/receipts.db`).
@@ -127,7 +132,8 @@ own approval system stays in charge. It is not a guard.
   words (`git reset --hard`, `git branch -D`, and a lease push still reads as a force push) and are
   prompted as before.
 - `git stash create` needs no identity configuration: the snapshot commit is made with a fixed
-  throwaway author (`safe-swap`).
+  throwaway author (`safe-swap`). Snapshots are kept alive by `refs/safe-swap/<id>`; `purge` deletes
+  those refs together with the quarantine folder.
 
 ## Relationship to Hermes' built-in checkpoints
 
@@ -143,6 +149,10 @@ history, discarded working-tree changes, deleted branches. They are complementar
   receipt is marked applied when they start.
 - `/unswap` for `git reset --hard` moves HEAD back only when the tree is clean and nobody committed
   since; otherwise it prints the old HEAD and leaves history alone.
+
+- On container backends (docker, ssh) the quarantine lives in that container's `$HOME`: bind-mounted
+  host files are copied there, and a recreated sandbox loses the quarantine.
+- Tested with Hermes' default in-process plugin loading; `plugins.isolation: host` was not exercised.
 
 ## Development
 

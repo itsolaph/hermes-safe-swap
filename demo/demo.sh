@@ -50,6 +50,6 @@ Then show the receipts and undo them:
 What to point out on camera:
   - (1) did not delete anything: build/ was moved into ~/.safe-swap/trash/<id>
   - (2) was refused: the remote holds a teammate commit the agent never fetched
-  - (3) kept the edit: it is in 'git stash list' as "safe-swap <id>"
+  - (3) kept the edit: it is saved under refs/safe-swap/<id> (git for-each-ref refs/safe-swap)
 Clean up with:  rm -rf "$SANDBOX"
 MSG
