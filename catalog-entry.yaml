@@ -19,7 +19,7 @@ description: >-
   .env, only the receipts it wrote; approvals are respected: the rewritten command goes through
   Hermes' normal approval gate, and because a swapped rm -rf is a move it no longer matches the
   recursive-delete pattern and does not prompt (the git rewrites keep prompting as before).
-  Targets such as /, ~, $HOME, system directories and anything under /tmp, sudo-prefixed
+  Targets such as /, ~, $HOME, system directories and anything under /tmp, privilege-elevated
   commands, and commands with heredocs, subshells, command substitution or eval/xargs/find -exec
   are deliberately left alone.
 maintainer: itsolaph

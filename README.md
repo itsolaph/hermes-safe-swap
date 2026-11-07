@@ -55,7 +55,7 @@ for the push rule (`--force-if-includes`).
 
 | Command | Runs as | Undo |
 |---|---|---|
-| `rm -r…`, `rm` with a glob, `rm file` | each target is moved to `~/.safe-swap/trash/<id>/<n>`; absolute paths go in `manifest.tsv`. Exit status, `-f` and "No such file" behave like `rm` | `/unswap <id>` moves everything back (refuses to overwrite unless `--force`) |
+| `rm -r…`, `rm` with a glob, `rm file` | each target is moved into the quarantine folder (`<id>/<n>`); absolute paths go in `manifest.tsv`. Exit status, `-f` and "No such file" behave like `rm` | `/unswap <id>` moves everything back (refuses to overwrite unless `--force`) |
 | `git push --force`, `-f`, `+refspec` | `--force-with-lease --force-if-includes` (an existing lease is left alone) | none: a lease only refuses pushes that would destroy someone else's work |
 | `git reset --hard [rev]` | `git stash create` + `stash store` first (the tree is not touched), then the original | `/unswap` moves HEAD back if nothing happened since, then re-applies the snapshot |
 | `git checkout -- <paths>`, `git checkout .`, `git restore <paths>` (not `--staged` only) | same snapshot, then the original | `/unswap` re-applies the snapshot |
@@ -64,7 +64,7 @@ for the push rule (`--force-if-includes`).
 Every rewrite is one grouped command (`{ …; }`) with the original's exit status, so `&&`, `||`,
 `|` and `;` around it mean what they meant before. Redirections are kept. Compound commands such as
 `cd x && rm -rf y | tee log` are rewritten segment by segment. Receipts are plain files, so
-recovery works by hand (`mv ~/.safe-swap/trash/<id>/1 <original path>`) even without the plugin.
+recovery works by hand (`mv` the numbered entry back to the path in `manifest.tsv`) even without the plugin.
 
 ## What it deliberately does NOT swap
 
