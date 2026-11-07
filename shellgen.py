@@ -59,9 +59,11 @@ def snapshot_block(base: str, rid: str, slot: str, gopts: str, original: str) ->
     g = f"git {gopts} " if gopts else "git "
     return (
         f"{{ {_slot_dir(base, rid, slot)}; "
+        f'mkdir -p -- "$SS_Q" 2>/dev/null && {{ {g}rev-parse --show-toplevel > "$SS_Q/gitdir" && '
+        f'{g}rev-parse HEAD > "$SS_Q/head"; }} 2>/dev/null; '
         f"SS_SHA=$({_GIT_IDENT} {g}stash create 2>/dev/null) || SS_SHA=; "
-        f'if [ -n "$SS_SHA" ] && mkdir -p -- "$SS_Q" && {g}stash store -m "safe-swap {rid}" "$SS_SHA" 2>/dev/null; then '
-        f'{g}rev-parse --show-toplevel > "$SS_Q/gitdir"; printf \'%s\\n\' "$SS_SHA" > "$SS_Q/stash.sha"; '
+        f'if [ -n "$SS_SHA" ] && [ -d "$SS_Q" ] && {g}stash store -m "safe-swap {rid}" "$SS_SHA" 2>/dev/null; then '
+        "printf '%s\\n' \"$SS_SHA\" > \"$SS_Q/stash.sha\"; "
         f"elif ! {g}diff --quiet HEAD -- 2>/dev/null; then "
         "printf 'safe-swap: could not snapshot the working tree; running unprotected\\n' >&2; fi; "
         f"unset SS_Q SS_SHA SS_RCPT; {original}; }}"
