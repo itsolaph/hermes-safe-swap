@@ -32,7 +32,7 @@ UNTOUCHED = [
     "rm -rf $TMPDIR/foo",
     "rm -rf /etc/nginx",
     "rm -rf /usr",
-    "rm -rf /home/someone",
+    "rm -rf /home",
     "rm -rf ~/.safe-swap/trash/abc123",
     "sudo rm -rf build",
     "sudo git push --force",

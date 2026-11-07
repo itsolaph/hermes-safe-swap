@@ -21,7 +21,7 @@ _CONFIG_TTL = 5.0
 _PLUGIN_NAME = "safe-swap"
 _WHAT = {
     "rm": "move-to-quarantine",
-    "push": "--force-with-lease --force-if-includes",
+    "push": "git push --force-with-lease --force-if-includes (not --force)",
     "reset": "preceded by a stash snapshot",
     "checkout": "preceded by a stash snapshot",
     "restore": "preceded by a stash snapshot",
