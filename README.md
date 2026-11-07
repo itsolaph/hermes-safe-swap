@@ -1,7 +1,7 @@
 # Safe-Swap for Hermes Agent
 
 **Safe-Swap never blocks and never nags.** When the agent runs a destructive shell command, a
-`pre_tool_call` hook silently swaps it for its reversible twin and keeps a receipt. `rm -rf build`
+`pre_tool_call` hook silently swaps it for its reversible twin and keeps a receipt. `rm -r build`
 becomes a move into a quarantine folder, `git push --force` becomes `--force-with-lease
 --force-if-includes`, `git reset --hard` takes a snapshot first. `/swaps` lists the receipts and
 `/unswap <id>` undoes them. The agent is told what really ran, so it never reasons from a false
@@ -10,8 +10,8 @@ picture. A skill or an MCP server cannot do this: only a hook sees the command b
 ## Demo
 
 ```text
-$ rm -rf build
-[safe-swap] `rm -rf build` was run as: move-to-quarantine (receipt b2a983). Undo: /unswap b2a983
+$ rm -r build
+[safe-swap] `rm -r build` was run as: move-to-quarantine (receipt b2a983). Undo: /unswap b2a983
 exit 0
 
 $ git push --force origin main          # a teammate pushed a commit the agent never fetched
@@ -28,7 +28,7 @@ exit 0
 id      age   status   kind      command
 a00c25  now   applied  reset     git reset --hard
 d18287  now   failed   push      git push --force origin main
-b2a983  now   applied  rm        rm -rf build
+b2a983  now   applied  rm        rm -r build
 
 > /unswap a00c25
 Undone a00c25.
