@@ -134,6 +134,26 @@ def test_unswap_restores_and_marks_undone(rt, svc, tmp_path) -> None:
     assert "already undone" in svc.unswap(rid)
 
 
+def test_unswap_missing_quarantine_leaves_receipt_retryable(rt, svc, tmp_path) -> None:
+    target = tmp_path / "keep.txt"
+    target.write_text("data")
+    rid = run_swapped(rt, "rm keep.txt")
+    slot = tmp_path / "home" / ".safe-swap" / "trash" / rid
+    held = slot.rename(tmp_path / "held")
+    assert not target.exists()
+
+    result = svc.unswap(rid)
+    assert "was NOT fully restored" in result
+    assert "nothing to restore" in result
+    assert rt.store().get(rid).status == "applied"
+    assert not target.exists()
+
+    held.rename(slot)
+    assert svc.unswap(rid).startswith(f"Undone {rid}")
+    assert target.read_text() == "data"
+    assert rt.store().get(rid).status == "undone"
+
+
 def test_unswap_last_skips_pushes(rt, svc, tmp_path) -> None:
     f = tmp_path / "keep.txt"
     f.write_text("data")
