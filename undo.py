@@ -131,7 +131,7 @@ def restore_script(base: str, rid: str, *, force: bool = False, kinds: Iterable[
         f"SS_B={base}; SS_RC=0; SS_ANY=0; SS_TAB=$(printf '\\t')\n"
         f'for SS_Q in "$SS_B/{rid}" "$SS_B/{rid}".*; do\n  [ -d "$SS_Q" ] || continue\n'
         + "".join(sections)
-        + f'done\n[ "$SS_ANY" = 1 ] || echo "nothing to restore for {rid}"\n'
+        + f'done\nif [ "$SS_ANY" = 0 ]; then echo "nothing to restore for {rid}"; SS_RC=1; fi\n'
         'if [ "$SS_RC" = 0 ]; then true; else false; fi'
     )
 
